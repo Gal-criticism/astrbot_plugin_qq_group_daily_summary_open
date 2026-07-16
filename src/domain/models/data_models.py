@@ -61,6 +61,17 @@ class QualityReview:
 
 
 @dataclass
+class WorkSummary:
+    """个人工作总结数据结构"""
+
+    user_id: str
+    name: str
+    summary: str          # 工作内容总结
+    tasks: list[str] = field(default_factory=list)  # 关键任务/事项
+    status: str = ""      # 工作状态（可选）
+
+
+@dataclass
 class TokenUsage:
     """Token使用统计"""
 

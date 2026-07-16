@@ -653,6 +653,7 @@ class ReportGenerator(IReportGenerator):
         stats = analysis_result["statistics"]
         topics = analysis_result["topics"]
         user_titles = analysis_result["user_titles"]
+        work_summaries = analysis_result.get("work_summaries", [])
 
         report = f"""
 🎯 群聊日常分析报告
@@ -686,6 +687,22 @@ class ReportGenerator(IReportGenerator):
         for i, golden_quote in enumerate(stats.golden_quotes[:max_golden_quotes], 1):
             report += f'{i}. "{golden_quote.content}" —— {golden_quote.sender}\n'
             report += f"   {golden_quote.reason}\n\n"
+
+        # 工作总结
+        if work_summaries:
+            report += "📋 工作总结\n"
+            for ws in work_summaries:
+                name = ws.name if hasattr(ws, "name") else ws.get("name", "")
+                summary = ws.summary if hasattr(ws, "summary") else ws.get("summary", "")
+                tasks = ws.tasks if hasattr(ws, "tasks") else ws.get("tasks", [])
+                status = ws.status if hasattr(ws, "status") else ws.get("status", "")
+                report += f"• {name}"
+                if status:
+                    report += f" [{status}]"
+                report += f"\n  {summary}\n"
+                if tasks:
+                    report += f"  关键任务: {', '.join(tasks)}\n"
+                report += "\n"
 
         return report
 
@@ -825,6 +842,40 @@ class ReportGenerator(IReportGenerator):
         )
         logger.info(f"金句HTML生成完成，长度: {len(quotes_html)}")
 
+        # 使用Jinja2模板构建工作总结HTML（批量渲染）
+        work_summaries_data = analysis_result.get("work_summaries", [])
+        work_summaries_list = []
+        for ws in work_summaries_data:
+            # 兼容 dataclass 和 dict
+            if hasattr(ws, "user_id"):
+                ws_dict = {
+                    "user_id": ws.user_id,
+                    "name": ws.name,
+                    "summary": ws.summary,
+                    "tasks": ws.tasks if ws.tasks else [],
+                    "status": ws.status if ws.status else "",
+                }
+            else:
+                ws_dict = {
+                    "user_id": ws.get("user_id", ""),
+                    "name": ws.get("name", ""),
+                    "summary": ws.get("summary", ""),
+                    "tasks": ws.get("tasks", []),
+                    "status": ws.get("status", ""),
+                }
+            work_summaries_list.append(ws_dict)
+
+        work_summaries_html = (
+            self.html_templates.render_template(
+                "work_summary_item.html",
+                work_summaries=work_summaries_list,
+                **common_context,
+            )
+            if work_summaries_list
+            else ""
+        )
+        logger.info(f"工作总结HTML生成完成，长度: {len(work_summaries_html)}")
+
         # 生成活跃度可视化HTML
         chart_data = self.activity_visualizer.get_hourly_chart_data(
             activity_viz.hourly_activity
@@ -883,6 +934,7 @@ class ReportGenerator(IReportGenerator):
             "quotes_html": quotes_html,
             "hourly_chart_html": hourly_chart_html,
             "chat_quality_html": chat_quality_html,
+            "work_summaries_html": work_summaries_html,
             "total_tokens": stats.token_usage.total_tokens
             if stats.token_usage.total_tokens
             else 0,

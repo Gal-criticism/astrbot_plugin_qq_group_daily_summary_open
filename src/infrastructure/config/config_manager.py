@@ -175,6 +175,26 @@ class ConfigManager:
             "chat_quality_analysis_enabled", False
         )
 
+    def get_work_summary_enabled(self) -> bool:
+        """获取是否启用工作总结分析"""
+        return self._get_group("analysis_features").get(
+            "work_summary_enabled", False
+        )
+
+    def get_max_work_summaries(self) -> int:
+        """获取最大工作总结人数"""
+        return self._get_group("analysis_features").get("max_work_summaries", 8)
+
+    def get_work_summary_prompt(self) -> str:
+        """获取工作总结分析提示词模板"""
+        prompts_config = self._get_group("prompts").get(
+            "work_summary_prompts", {}
+        )
+        prompt = prompts_config.get("work_summary_prompt", "")
+        if prompt:
+            return prompt
+        return ""
+
     def get_max_topics(self) -> int:
         """获取最大话题数量"""
         return self._get_group("analysis_features").get("max_topics", 5)
@@ -271,6 +291,10 @@ class ConfigManager:
     def get_golden_quote_provider_id(self) -> str:
         """获取金句分析专用 Provider ID"""
         return self._get_group("llm").get("golden_quote_provider_id", "")
+
+    def get_work_summary_provider_id(self) -> str:
+        """获取工作总结分析专用 Provider ID"""
+        return self._get_group("llm").get("work_summary_provider_id", "")
 
     def get_keep_original_persona(self) -> bool:
         """获取是否继承会话原始人格设定"""
@@ -376,6 +400,7 @@ class ConfigManager:
             "topic_analysis_prompts",
             "user_title_analysis_prompts",
             "golden_quote_analysis_prompts",
+            "work_summary_prompts",
         ):
             target_group = self._get_group("prompts").get(group, {})
         else:
@@ -422,6 +447,11 @@ class ConfigManager:
             "golden_quote_analysis_prompts",
             "golden_quote_v2_prompt",
             self.set_golden_quote_analysis_prompt,
+        )
+        modified |= self._upgrade_config_item(
+            "work_summary_prompts",
+            "work_summary_prompt",
+            self.set_work_summary_prompt,
         )
 
         # 2. 文件名格式升级
@@ -618,6 +648,24 @@ class ConfigManager:
         self._ensure_group("analysis_features")["chat_quality_analysis_enabled"] = (
             enabled
         )
+        self.config.save_config()
+
+    def set_work_summary_enabled(self, enabled: bool):
+        """设置是否启用工作总结分析"""
+        self._ensure_group("analysis_features")["work_summary_enabled"] = enabled
+        self.config.save_config()
+
+    def set_max_work_summaries(self, count: int):
+        """设置最大工作总结人数"""
+        self._ensure_group("analysis_features")["max_work_summaries"] = count
+        self.config.save_config()
+
+    def set_work_summary_prompt(self, prompt: str):
+        """设置工作总结分析提示词模板"""
+        prompts = self._ensure_group("prompts")
+        if "work_summary_prompts" not in prompts:
+            prompts["work_summary_prompts"] = {}
+        prompts["work_summary_prompts"]["work_summary_prompt"] = prompt
         self.config.save_config()
 
     def set_max_topics(self, count: int):

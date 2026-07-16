@@ -74,6 +74,28 @@ def build_golden_quotes_schema(max_items: int) -> JSONObject:
     }
 
 
+def build_work_summaries_schema(max_items: int) -> JSONObject:
+    return {
+        "type": "array",
+        "maxItems": max(1, int(max_items)),
+        "items": {
+            "type": "object",
+            "properties": {
+                "user_id": {"type": "string"},
+                "name": {"type": "string"},
+                "summary": {"type": "string"},
+                "tasks": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "status": {"type": "string"},
+            },
+            "required": ["user_id", "name", "summary", "tasks"],
+            "additionalProperties": False,
+        },
+    }
+
+
 def build_chat_quality_schema(max_dimensions: int) -> JSONObject:
     return {
         "type": "object",

@@ -113,6 +113,7 @@ class GroupAnalysisResult:
     topics: list[SummaryTopic] = field(default_factory=list)
     user_titles: list[UserTitle] = field(default_factory=list)
     golden_quotes: list[GoldenQuote] = field(default_factory=list)
+    work_summaries: list = field(default_factory=list)  # WorkSummary
 
     # 元数据
     token_usage: TokenUsage = field(default_factory=TokenUsage)
@@ -121,4 +122,4 @@ class GroupAnalysisResult:
 
     def has_content(self) -> bool:
         """检查结果是否有分析内容"""
-        return bool(self.topics or self.user_titles or self.golden_quotes)
+        return bool(self.topics or self.user_titles or self.golden_quotes or self.work_summaries)

@@ -238,11 +238,15 @@ class AnalysisApplicationService:
             chat_quality_enabled = (
                 self.config_manager.get_chat_quality_analysis_enabled()
             )
+            work_summary_enabled = (
+                self.config_manager.get_work_summary_enabled()
+            )
 
             topics = []
             user_titles = []
             golden_quotes = []
             chat_quality_review = None
+            work_summaries = []
             total_token_usage = TokenUsage()
 
             # Note: LLMAnalyzer 目前可能只接收 legacy 格式或特定的 UnifiedMessage 适配
@@ -260,6 +264,7 @@ class AnalysisApplicationService:
                 or user_title_enabled
                 or golden_quote_enabled
                 or chat_quality_enabled
+                or work_summary_enabled
             ):
                 async with self.llm_semaphore:
                     logger.debug(f"[LLM] 已进入分析队列 (群: {group_id})")
@@ -269,6 +274,7 @@ class AnalysisApplicationService:
                         golden_quotes,
                         total_token_usage,
                         chat_quality_review,
+                        work_summaries,
                     ) = await self.llm_analyzer.analyze_all_concurrent(
                         legacy_messages,
                         user_activity,
@@ -278,6 +284,7 @@ class AnalysisApplicationService:
                         user_title_enabled=user_title_enabled,
                         golden_quote_enabled=golden_quote_enabled,
                         chat_quality_enabled=chat_quality_enabled,
+                        work_summary_enabled=work_summary_enabled,
                     )
 
             # 回填结果
@@ -290,6 +297,7 @@ class AnalysisApplicationService:
                 "user_titles": user_titles,
                 "user_analysis": user_activity,
                 "chat_quality_review": chat_quality_review,
+                "work_summaries": work_summaries,
             }
 
             # 6. 持久化摘要 (Persistence)
