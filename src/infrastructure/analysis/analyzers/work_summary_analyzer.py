@@ -165,15 +165,13 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
             "3. 如果某人的工作内容无法从对话中确定，请标注'未从对话中体现明确工作内容'。\n\n"
             "群聊消息：\n"
             f"{messages_text}\n\n"
-            f"请为每个主要参与者输出工作总结，最多 {max_summaries} 人。\n\n"
+            f"请为每个主要参与者输出工作总结。\n\n"
             "返回纯 JSON 数组，格式如下：\n"
             "[\n"
             "  {\n"
             '    "user_id": "123456",\n'
             '    "name": "小王",\n'
-            '    "summary": "负责竞品分析报告的撰写...",\n'
-            '    "tasks": ["竞品分析", "数据整理"],\n'
-            '    "status": "进行中"\n'
+            '    "summary": "1. 负责竞品分析报告的撰写...; 2. 负责 xx 的用户调研..."\n'
             "  }\n"
             "]\n"
             "注意：返回的内容必须是纯 JSON，不要包含 markdown 代码块标记或其他格式。"
