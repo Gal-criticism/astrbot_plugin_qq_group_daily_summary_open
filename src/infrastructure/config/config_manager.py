@@ -112,7 +112,7 @@ class ConfigManager:
 
     def get_max_messages(self) -> int:
         """获取最大消息数量"""
-        return self._get_group("basic").get("max_messages", 1000)
+        return self._get_group("basic").get("max_messages", 2000)
 
     def get_analysis_days(self) -> int:
         """获取分析天数"""
@@ -151,22 +151,22 @@ class ConfigManager:
 
     def get_min_messages_threshold(self) -> int:
         """获取最小消息阈值"""
-        return self._get_group("basic").get("min_messages_threshold", 50)
+        return self._get_group("basic").get("min_messages_threshold", 5)
 
     def get_topic_analysis_enabled(self) -> bool:
         """获取是否启用话题分析"""
-        return self._get_group("analysis_features").get("topic_analysis_enabled", True)
+        return self._get_group("analysis_features").get("topic_analysis_enabled", False)
 
     def get_user_title_analysis_enabled(self) -> bool:
         """获取是否启用用户称号分析"""
         return self._get_group("analysis_features").get(
-            "user_title_analysis_enabled", True
+            "user_title_analysis_enabled", False
         )
 
     def get_golden_quote_analysis_enabled(self) -> bool:
         """获取是否启用金句分析"""
         return self._get_group("analysis_features").get(
-            "golden_quote_analysis_enabled", True
+            "golden_quote_analysis_enabled", False
         )
 
     def get_chat_quality_analysis_enabled(self) -> bool:
@@ -177,11 +177,11 @@ class ConfigManager:
 
     def get_work_summary_enabled(self) -> bool:
         """获取是否启用工作总结分析"""
-        return self._get_group("analysis_features").get("work_summary_enabled", False)
+        return self._get_group("analysis_features").get("work_summary_enabled", True)
 
     def get_max_work_summaries(self) -> int:
         """获取最大工作总结人数"""
-        return self._get_group("analysis_features").get("max_work_summaries", 8)
+        return self._get_group("analysis_features").get("max_work_summaries", 30)
 
     def get_work_summary_prompt(self) -> str:
         """获取工作总结分析提示词模板"""

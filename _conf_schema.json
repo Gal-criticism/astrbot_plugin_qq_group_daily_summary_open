@@ -33,13 +33,13 @@
             "max_messages": {
                 "type": "int",
                 "description": "单次分析的获取最大消息条数基准",
-                "default": 1000,
+                "default": 2000,
                 "hint": "单次分析的获取最大消息条数基准值，如果当天群聊消息过多，已经获取到足够的消息(达到 max_messages)，停止获取，获取到的消息数量是最新一次获取到的超过 max_messages 的消息数量，建议500-2000"
             },
             "min_messages_threshold": {
                 "type": "int",
                 "description": "最小消息数阈值",
-                "default": 200,
+                "default": 5,
                 "hint": "进行分析所需的最小消息数量"
             },
             "bot_self_ids": {
@@ -362,37 +362,37 @@
             "topic_analysis_enabled": {
                 "type": "bool",
                 "description": "启用话题分析",
-                "default": true,
+                "default": false,
                 "hint": "是否使用LLM进行智能话题分析"
             },
             "user_title_analysis_enabled": {
                 "type": "bool",
                 "description": "启用用户称号分析",
-                "default": true,
+                "default": false,
                 "hint": "是否使用LLM进行用户称号分析"
             },
             "golden_quote_analysis_enabled": {
                 "type": "bool",
                 "description": "启用金句分析",
-                "default": true,
+                "default": false,
                 "hint": "是否使用LLM进行金句分析"
             },
             "chat_quality_analysis_enabled": {
                 "type": "bool",
                 "description": "启用聊天质量锐评",
-                "default": true,
+                "default": false,
                 "hint": "是否使用LLM进行聊天质量锐评（维度化分析）"
             },
             "work_summary_enabled": {
                 "type": "bool",
                 "description": "启用工作总结分析",
-                "default": false,
+                "default": true,
                 "hint": "是否使用LLM从全量对话中推断每个人的工作内容，适合工作群使用"
             },
             "max_work_summaries": {
                 "type": "int",
                 "description": "最大工作总结人数",
-                "default": 8,
+                "default": 30,
                 "hint": "工作总结中最多显示的人数"
             },
             "max_topics": {
