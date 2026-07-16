@@ -5,6 +5,7 @@
 
 import re
 from datetime import datetime
+from typing import TypedDict
 
 from ....domain.models.data_models import TokenUsage, WorkSummary
 from ....utils.logger import logger
@@ -12,6 +13,13 @@ from ...utils.template_utils import render_template
 from ..utils import InfoUtils
 from ..utils.structured_output_schema import JSONObject, build_work_summaries_schema
 from .base_analyzer import BaseAnalyzer
+
+
+class _Message(TypedDict):
+    sender: str
+    time: str
+    content: str
+    user_id: str
 
 
 class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
@@ -57,7 +65,7 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
             return ""
 
         # 提取文本消息（复用 TopicAnalyzer 的消息格式）
-        text_messages = []
+        text_messages: list[_Message] = []
         for i, msg in enumerate(data):
             if not isinstance(msg, dict):
                 continue
@@ -74,7 +82,9 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
                     continue
 
                 nickname = InfoUtils.get_user_nickname(self.config_manager, sender)
-                msg_time = datetime.fromtimestamp(msg.get("time", 0)).strftime("%H:%M")
+                msg_time = datetime.fromtimestamp(msg.get("time", 0)).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
 
                 message_list = msg.get("message", [])
 
@@ -133,7 +143,7 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
         # 使用用户提供的 ID-Only 格式
         messages_text = "\n".join(
             [
-                f"[{msg['time']}] [{msg['user_id']}]: {msg['content']}"
+                f"[{msg['time']}] [{msg['sender']}]: {msg['content']}"
                 for msg in text_messages
             ]
         )
