@@ -10,7 +10,6 @@ from ....domain.models.data_models import TokenUsage, WorkSummary
 from ....utils.logger import logger
 from ...utils.template_utils import render_template
 from ..utils import InfoUtils
-from ..utils.json_utils import parse_json_response
 from ..utils.structured_output_schema import JSONObject, build_work_summaries_schema
 from .base_analyzer import BaseAnalyzer
 
@@ -168,15 +167,15 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
             f"{messages_text}\n\n"
             f"请为每个主要参与者输出工作总结，最多 {max_summaries} 人。\n\n"
             "返回纯 JSON 数组，格式如下：\n"
-            '[\n'
-            '  {\n'
+            "[\n"
+            "  {\n"
             '    "user_id": "123456",\n'
             '    "name": "小王",\n'
             '    "summary": "负责竞品分析报告的撰写...",\n'
             '    "tasks": ["竞品分析", "数据整理"],\n'
             '    "status": "进行中"\n'
-            '  }\n'
-            ']\n'
+            "  }\n"
+            "]\n"
             "注意：返回的内容必须是纯 JSON，不要包含 markdown 代码块标记或其他格式。"
         )
         logger.info("使用内置默认工作总结提示词")
@@ -199,6 +198,7 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
             json_match = re.search(r"\[.*?\]", result_text, re.DOTALL)
             if json_match:
                 import json
+
                 parsed = json.loads(json_match.group(0))
                 if isinstance(parsed, list):
                     return parsed[:max_count]
@@ -226,7 +226,9 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
 
             for i, summary_data in enumerate(data_list[:max_count]):
                 if not isinstance(summary_data, dict):
-                    logger.warning(f"跳过非字典类型的工作总结数据: {type(summary_data)}")
+                    logger.warning(
+                        f"跳过非字典类型的工作总结数据: {type(summary_data)}"
+                    )
                     continue
 
                 try:
@@ -255,10 +257,14 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
                         )
                     )
                 except Exception as e:
-                    logger.error(f"处理第 {i + 1} 条工作总结数据时出错: {e}", exc_info=True)
+                    logger.error(
+                        f"处理第 {i + 1} 条工作总结数据时出错: {e}", exc_info=True
+                    )
                     continue
 
-            logger.debug(f"create_data_objects 完成，创建了 {len(summaries)} 个工作总结对象")
+            logger.debug(
+                f"create_data_objects 完成，创建了 {len(summaries)} 个工作总结对象"
+            )
             return summaries
 
         except Exception as e:
@@ -283,7 +289,9 @@ class WorkSummaryAnalyzer(BaseAnalyzer[WorkSummary, list[dict]]):
             (工作总结列表, Token使用统计)
         """
         try:
-            logger.info(f"开始工作总结分析，消息数量: {len(messages) if messages else 0}")
+            logger.info(
+                f"开始工作总结分析，消息数量: {len(messages) if messages else 0}"
+            )
 
             if not messages:
                 logger.info("没有消息，返回空结果")

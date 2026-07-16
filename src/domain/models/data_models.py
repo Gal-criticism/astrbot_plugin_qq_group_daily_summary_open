@@ -66,9 +66,9 @@ class WorkSummary:
 
     user_id: str
     name: str
-    summary: str          # 工作内容总结
+    summary: str  # 工作内容总结
     tasks: list[str] = field(default_factory=list)  # 关键任务/事项
-    status: str = ""      # 工作状态（可选）
+    status: str = ""  # 工作状态（可选）
 
 
 @dataclass

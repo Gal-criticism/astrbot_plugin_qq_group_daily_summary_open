@@ -177,9 +177,7 @@ class ConfigManager:
 
     def get_work_summary_enabled(self) -> bool:
         """获取是否启用工作总结分析"""
-        return self._get_group("analysis_features").get(
-            "work_summary_enabled", False
-        )
+        return self._get_group("analysis_features").get("work_summary_enabled", False)
 
     def get_max_work_summaries(self) -> int:
         """获取最大工作总结人数"""
@@ -187,9 +185,7 @@ class ConfigManager:
 
     def get_work_summary_prompt(self) -> str:
         """获取工作总结分析提示词模板"""
-        prompts_config = self._get_group("prompts").get(
-            "work_summary_prompts", {}
-        )
+        prompts_config = self._get_group("prompts").get("work_summary_prompts", {})
         prompt = prompts_config.get("work_summary_prompt", "")
         if prompt:
             return prompt

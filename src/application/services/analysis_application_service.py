@@ -238,9 +238,7 @@ class AnalysisApplicationService:
             chat_quality_enabled = (
                 self.config_manager.get_chat_quality_analysis_enabled()
             )
-            work_summary_enabled = (
-                self.config_manager.get_work_summary_enabled()
-            )
+            work_summary_enabled = self.config_manager.get_work_summary_enabled()
 
             topics = []
             user_titles = []

@@ -9,4 +9,10 @@ from .topic_analyzer import TopicAnalyzer
 from .user_title_analyzer import UserTitleAnalyzer
 from .work_summary_analyzer import WorkSummaryAnalyzer
 
-__all__ = ["BaseAnalyzer", "TopicAnalyzer", "UserTitleAnalyzer", "GoldenQuoteAnalyzer", "WorkSummaryAnalyzer"]
+__all__ = [
+    "BaseAnalyzer",
+    "TopicAnalyzer",
+    "UserTitleAnalyzer",
+    "GoldenQuoteAnalyzer",
+    "WorkSummaryAnalyzer",
+]

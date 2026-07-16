@@ -693,7 +693,9 @@ class ReportGenerator(IReportGenerator):
             report += "📋 工作总结\n"
             for ws in work_summaries:
                 name = ws.name if hasattr(ws, "name") else ws.get("name", "")
-                summary = ws.summary if hasattr(ws, "summary") else ws.get("summary", "")
+                summary = (
+                    ws.summary if hasattr(ws, "summary") else ws.get("summary", "")
+                )
                 tasks = ws.tasks if hasattr(ws, "tasks") else ws.get("tasks", [])
                 status = ws.status if hasattr(ws, "status") else ws.get("status", "")
                 report += f"• {name}"
