@@ -84,13 +84,8 @@ def build_work_summaries_schema(max_items: int) -> JSONObject:
                 "user_id": {"type": "string"},
                 "name": {"type": "string"},
                 "summary": {"type": "string"},
-                "tasks": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "status": {"type": "string"},
             },
-            "required": ["user_id", "name", "summary", "tasks"],
+            "required": ["user_id", "name", "summary"],
             "additionalProperties": False,
         },
     }
