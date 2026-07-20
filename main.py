@@ -907,7 +907,7 @@ class GroupDailyAnalysis(Star):
             auto_status = (
                 "已启用" if self.config_manager.is_auto_analysis_enabled() else "未启用"
             )
-            auto_time = self.config_manager.get_auto_analysis_time()
+            auto_cron = self.config_manager.get_auto_analysis_cron()
 
             output_format = self.config_manager.get_output_format()
             min_threshold = self.config_manager.get_min_messages_threshold()
@@ -930,7 +930,7 @@ class GroupDailyAnalysis(Star):
 
             yield event.plain_result(f"""📊 当前群分析功能状态:
 • 群分析功能: {status} (模式: {mode})
-• 自动分析: {auto_status} ({auto_time})
+• 自动分析: {auto_status} (cron: {auto_cron})
 • 增量分析: {incremental_status_text}
 • 调试模式: {debug_status} (增量立即报告)
 • 输出格式: {output_format}
