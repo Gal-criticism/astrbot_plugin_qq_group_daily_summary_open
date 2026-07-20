@@ -170,34 +170,29 @@ class AutoScheduler:
             logger.info("增量分析总开关未启用，仅执行传统定时全量分析。")
 
     def _schedule_report_time_jobs(self, scheduler):
-        """在配置的时间点注册报告生成任务。
+        """在配置的 cron 表达式时间点注册报告生成任务。
 
         这些任务根据运行时解析出的生效模式，决定执行传统的全量分析还是增量汇报。
         """
-        time_config = self.config_manager.get_auto_analysis_time()
-        if isinstance(time_config, str):
-            time_config = [time_config]
+        expr = self.config_manager.get_auto_analysis_cron()
 
-        for i, t_str in enumerate(time_config):
-            try:
-                t_str = str(t_str).replace("：", ":").strip()
-                hour, minute = t_str.split(":")
+        try:
+            expr = str(expr).strip()
+            trigger = CronTrigger.from_crontab(expr)
+            job_id = "astrbot_plugin_qq_group_daily_analysis_report"
 
-                trigger = CronTrigger(hour=int(hour), minute=int(minute))
-                job_id = f"astrbot_plugin_qq_group_daily_analysis_trigger_{i}"
+            scheduler.add_job(
+                self._run_scheduled_report,
+                trigger=trigger,
+                id=job_id,
+                replace_existing=True,
+                misfire_grace_time=60,
+            )
+            self.scheduler_job_ids.append(job_id)
+            logger.info(f"已注册定时报告任务: {expr} (Job ID: {job_id})")
 
-                scheduler.add_job(
-                    self._run_scheduled_report,
-                    trigger=trigger,
-                    id=job_id,
-                    replace_existing=True,
-                    misfire_grace_time=60,
-                )
-                self.scheduler_job_ids.append(job_id)
-                logger.info(f"已注册定时报告任务: {t_str} (Job ID: {job_id})")
-
-            except Exception as e:
-                logger.error(f"注册定时任务失败 ({t_str}): {e}")
+        except Exception as e:
+            logger.error(f"注册定时任务失败 ({expr}): {e}")
 
     def _schedule_incremental_cron_jobs(self, scheduler):
         """

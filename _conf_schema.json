@@ -255,16 +255,11 @@
         "type": "object",
         "hint": "配置每日自动分析的时间点和目标群聊范围。只有先通过基础群权限的群，才会在这里继续判断。",
         "items": {
-            "auto_analysis_time": {
-                "type": "list",
-                "description": "自动分析时间列表",
-                "default": [
-                    "23:00"
-                ],
-                "hint": "每天几点自动出报告，格式是 HH:MM。可填多个时间，例如 [\"09:00\", \"21:30\"]。",
-                "items": {
-                    "type": "string"
-                }
+            "auto_analysis_cron": {
+                "type": "string",
+                "description": "自动分析 Cron 表达式",
+                "default": "0 23 * * *",
+                "hint": "标准 5 段 cron 表达式 (分 时 日 月 周)。字段内用逗号表示多个值，如 '0 9,21 * * *' 即每天 9 点和 21 点各触发一次。注意: 拉取天数由 basic.analysis_days 独立控制，与 cron 频率无关。"
             },
             "scheduled_group_list_mode": {
                 "type": "string",

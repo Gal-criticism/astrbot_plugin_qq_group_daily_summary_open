@@ -118,23 +118,62 @@ class ConfigManager:
         """获取分析天数"""
         return self._get_group("basic").get("analysis_days", 1)
 
-    def get_auto_analysis_time(self) -> list[str]:
-        """获取自动分析时间列表"""
+    def get_auto_analysis_cron(self) -> str:
+        """获取自动分析 cron 表达式
+
+        返回标准 5 段 cron 表达式字符串（分 时 日 月 周）。
+        支持兼容旧版 HH:MM 格式自动转换。
+        """
         group = self._get_group("auto_analysis")
-        val = group.get("auto_analysis_time", ["09:00"])
-        # 兼容旧版本字符串配置
-        if isinstance(val, str):
-            val_list = [val]
-            # 自动修复配置格式
-            try:
+
+        # 新格式: auto_analysis_cron
+        val = group.get("auto_analysis_cron")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+
+        # 兼容旧格式: auto_analysis_time (HH:MM 列表 / 字符串)
+        legacy = group.get("auto_analysis_time")
+        if legacy:
+            if isinstance(legacy, str):
+                legacy = [legacy]
+            if isinstance(legacy, list) and legacy:
+                # 取第一个时间，转为 cron 表达式
+                converted = self._hhmm_to_cron(legacy[0])
+                if len(legacy) > 1:
+                    logger.warning(
+                        f"旧版 auto_analysis_time 包含多个时间 {legacy}，"
+                        f"已转为单条 cron: {converted}。如需多时间点，请手动编辑 cron 字段（如 '0 9,21 * * *'）。"
+                    )
+                logger.info(
+                    f"检测到旧版 auto_analysis_time 配置，已自动转换为 cron: {legacy} -> {converted}"
+                )
                 auto_group = self._ensure_group("auto_analysis")
-                auto_group["auto_analysis_time"] = val_list
-                self.config.save_config()
-                logger.info(f"自动修复配置格式 auto_analysis_time: {val} -> {val_list}")
-            except Exception as e:
-                logger.warning(f"修复配置格式失败: {e}")
-            return val_list
-        return val if isinstance(val, list) else ["09:00"]
+                auto_group["auto_analysis_cron"] = converted
+                auto_group.pop("auto_analysis_time", None)
+                try:
+                    self.config.save_config()
+                except Exception as e:
+                    logger.warning(f"自动保存 cron 配置失败: {e}")
+                return converted
+
+        return "0 9 * * *"
+
+    @staticmethod
+    def _hhmm_to_cron(hhmm: str) -> str:
+        """将 HH:MM 格式转换为 5 段 cron 表达式"""
+        hhmm = hhmm.replace("：", ":").strip()
+        parts = hhmm.split(":")
+        hour = int(parts[0])
+        minute = int(parts[1]) if len(parts) > 1 else 0
+        return f"{minute} {hour} * * *"
+
+    def get_auto_analysis_time(self) -> list[str]:
+        """[已废弃] 获取自动分析时间列表
+
+        保留以兼容旧调用方。推荐使用 get_auto_analysis_cron()。
+        """
+        cron = self.get_auto_analysis_cron()
+        return [cron]
 
     def get_enable_auto_analysis(self) -> bool:
         """
@@ -555,10 +594,17 @@ class ConfigManager:
         self._ensure_group("basic")["analysis_days"] = days
         self.config.save_config()
 
-    def set_auto_analysis_time(self, time_val: str | list[str]):
-        """设置自动分析时间点"""
-        self._ensure_group("auto_analysis")["auto_analysis_time"] = time_val
+    def set_auto_analysis_cron(self, cron_val: str):
+        """设置自动分析 cron 表达式"""
+        self._ensure_group("auto_analysis")["auto_analysis_cron"] = cron_val
         self.config.save_config()
+
+    def set_auto_analysis_time(self, time_val: str | list[str]):
+        """[已废弃] 设置自动分析时间点（转换为 cron 格式）"""
+        if isinstance(time_val, list):
+            time_val = time_val[0] if time_val else "09:00"
+        cron_val = self._hhmm_to_cron(time_val)
+        self.set_auto_analysis_cron(cron_val)
 
     def is_auto_analysis_enabled(self) -> bool:
         """
