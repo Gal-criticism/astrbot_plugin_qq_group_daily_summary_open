@@ -167,14 +167,6 @@ class ConfigManager:
         minute = int(parts[1]) if len(parts) > 1 else 0
         return f"{minute} {hour} * * *"
 
-    def get_auto_analysis_time(self) -> list[str]:
-        """[已废弃] 获取自动分析时间列表
-
-        保留以兼容旧调用方。推荐使用 get_auto_analysis_cron()。
-        """
-        cron = self.get_auto_analysis_cron()
-        return [cron]
-
     def get_enable_auto_analysis(self) -> bool:
         """
         获取是否启用自动分析（兼容旧接口）。
@@ -598,13 +590,6 @@ class ConfigManager:
         """设置自动分析 cron 表达式"""
         self._ensure_group("auto_analysis")["auto_analysis_cron"] = cron_val
         self.config.save_config()
-
-    def set_auto_analysis_time(self, time_val: str | list[str]):
-        """[已废弃] 设置自动分析时间点（转换为 cron 格式）"""
-        if isinstance(time_val, list):
-            time_val = time_val[0] if time_val else "09:00"
-        cron_val = self._hhmm_to_cron(time_val)
-        self.set_auto_analysis_cron(cron_val)
 
     def is_auto_analysis_enabled(self) -> bool:
         """
