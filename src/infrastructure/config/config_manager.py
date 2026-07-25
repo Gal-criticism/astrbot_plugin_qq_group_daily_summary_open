@@ -822,6 +822,12 @@ class ConfigManager:
         self._ensure_group("qq_group_upload")["group_album_strict_mode"] = enabled
         self.config.save_config()
 
+    # ========== 存储配置 ==========
+
+    def get_postgres_dsn(self) -> str:
+        """获取 PostgreSQL 连接串，空字符串表示未配置"""
+        return self._get_group("storage").get("postgres_dsn", "").strip()
+
     # ========== 增量分析配置 ==========
 
     def get_incremental_enabled(self) -> bool:

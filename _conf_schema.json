@@ -636,6 +636,19 @@
             }
         }
     },
+    "storage": {
+        "description": "数据持久化设置",
+        "type": "object",
+        "hint": "配置分析结果的持久化存储。不填 Postgres DSN 则不启用入库。",
+        "items": {
+            "postgres_dsn": {
+                "type": "string",
+                "description": "PostgreSQL 连接串",
+                "default": "",
+                "hint": "格式: postgresql://user:password@host:5432/dbname。留空则跳过入库。"
+            }
+        }
+    },
     "performance": {
         "description": "并发限流设置",
         "type": "object",

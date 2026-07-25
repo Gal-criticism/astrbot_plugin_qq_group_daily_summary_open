@@ -60,6 +60,7 @@ class AnalysisApplicationService:
         self.analysis_domain_service = analysis_domain_service
         self.incremental_store = incremental_store
         self.incremental_merge_service = incremental_merge_service
+        self._postgres_repo = None  # lazily set by main.py after init
         self._locks = weakref.WeakValueDictionary()
         # 全局 LLM 分析信号量，控制对外 API 的并发压力
         # 使用专用的 LLM 并发配置项
@@ -300,6 +301,8 @@ class AnalysisApplicationService:
 
             # 6. 持久化摘要 (Persistence)
             await self.history_manager.save_analysis(group_id, analysis_result)
+            if self._postgres_repo:
+                await self._postgres_repo.save(group_id, analysis_result)
 
             # 7. 生成报告并发送 (应用层编排发送动作)
             # 这里由调用方处理发送，本服务只返回分析结果和可能的视觉产物

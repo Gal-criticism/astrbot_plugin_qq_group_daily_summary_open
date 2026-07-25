@@ -35,6 +35,9 @@ from .src.infrastructure.config.config_manager import ConfigManager
 from .src.infrastructure.messaging.message_sender import MessageSender
 from .src.infrastructure.persistence.history_manager import HistoryManager
 from .src.infrastructure.persistence.incremental_store import IncrementalStore
+from .src.infrastructure.persistence.postgres_history_repository import (
+    PostgresHistoryRepository,
+)
 from .src.infrastructure.persistence.telegram_group_registry import (
     TelegramGroupRegistry,
 )
@@ -73,6 +76,7 @@ class GroupDailyAnalysis(Star):
     template_preview_router: TemplatePreviewRouter
     auto_scheduler: AutoScheduler
     message_sender: MessageSender
+    postgres_repo: PostgresHistoryRepository | None
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -131,8 +135,17 @@ class GroupDailyAnalysis(Star):
             handlers=[self.telegram_template_preview_handler]
         )
 
-        # 调度与发送
         self.message_sender = MessageSender(self.bot_manager, self.config_manager)
+
+        # Postgres 入库
+        dsn = self.config_manager.get_postgres_dsn()
+        if dsn:
+            self.postgres_repo = PostgresHistoryRepository(dsn)
+            self.analysis_service._postgres_repo = self.postgres_repo
+            logger.info("Postgres 入库已启用")
+        else:
+            self.postgres_repo = None
+
         self.auto_scheduler = AutoScheduler(
             self.config_manager,
             self.analysis_service,
@@ -259,6 +272,9 @@ class GroupDailyAnalysis(Star):
 
             if self.report_generator:
                 await self.report_generator.close()
+
+            if self.postgres_repo:
+                await self.postgres_repo.close()
 
             # 3. [关键修复] 只有在任务全部清理后，才清理引用。
             # 实际上，在 terminate 结束后，self 本身就会被 GC 释放，
@@ -943,6 +959,67 @@ class GroupDailyAnalysis(Star):
 💡 可用命令: enable, disable, status, reload, test, incremental_debug
 💡 支持的输出格式: image, text (图片包含活跃度可视化)
 💡 其他命令: /设置格式, /增量状态""")
+
+    @filter.command("历史分析", alias={"history"})
+    @filter.permission_type(PermissionType.ADMIN)
+    async def query_analysis_history(self, event: AstrMessageEvent, count: str = ""):
+        """
+        查询群分析历史记录
+        用法: /历史分析 [条数]
+        - /历史分析     → 最近 7 条
+        - /历史分析 3   → 最近 3 条
+        """
+        event.should_call_llm(True)
+        group_id = self._get_group_id_from_event(event)
+        if not group_id:
+            yield event.plain_result("❌ 请在群聊中使用此命令")
+            return
+
+        if not self.postgres_repo:
+            yield event.plain_result("❌ 未配置 Postgres 入库，无法查询历史记录")
+            return
+
+        try:
+            limit = 7
+            if count.isdigit():
+                limit = max(1, min(int(count), 90))
+
+            results = await self.postgres_repo.get_recent(group_id, limit=limit)
+
+            if not results:
+                yield event.plain_result("📭 未找到该群的历史分析记录")
+                return
+
+            lines = [f"📊 本群最近 {len(results)} 条分析记录:\n"]
+            for r in results:
+                rid = r.get("id", "?")
+                created = r.get("created_at", "?")
+                stats = r.get("statistics", {})
+                msg_count = (
+                    getattr(stats, "message_count", 0)
+                    if hasattr(stats, "message_count")
+                    else stats.get("message_count", "?")
+                )
+                participant = (
+                    getattr(stats, "participant_count", 0)
+                    if hasattr(stats, "participant_count")
+                    else stats.get("participant_count", "?")
+                )
+                topics = r.get("topics", [])
+                topic_str = "、".join(
+                    t.get("topic", t.topic if hasattr(t, "topic") else "?")
+                    for t in topics[:3]
+                )
+                lines.append(
+                    f"#{rid} {created} | 💬 {msg_count}条 | 👥 {participant}人\n"
+                    f"   话题: {topic_str or '（无）'}"
+                )
+
+            yield event.plain_result("\n".join(lines))
+
+        except Exception as e:
+            logger.error(f"查询历史分析记录失败: {e}", exc_info=True)
+            yield event.plain_result(f"❌ 查询失败: {e}")
 
     @filter.command("增量状态", alias={"incremental_status"})
     @filter.permission_type(PermissionType.ADMIN)
