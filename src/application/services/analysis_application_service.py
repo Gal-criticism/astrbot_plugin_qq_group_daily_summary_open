@@ -60,7 +60,7 @@ class AnalysisApplicationService:
         self.analysis_domain_service = analysis_domain_service
         self.incremental_store = incremental_store
         self.incremental_merge_service = incremental_merge_service
-        self._postgres_repo = None  # lazily set by main.py after init
+        self._postgres_repo: Any = None  # lazily set by main.py after init
         self._locks = weakref.WeakValueDictionary()
         # 全局 LLM 分析信号量，控制对外 API 的并发压力
         # 使用专用的 LLM 并发配置项

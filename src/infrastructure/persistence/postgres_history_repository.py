@@ -36,6 +36,7 @@ class PostgresHistoryRepository:
     async def _ensure_pool(self) -> asyncpg.Pool:
         if self._pool is None:
             self._pool = await asyncpg.create_pool(self.dsn, min_size=1, max_size=3)
+            assert self._pool is not None
             async with self._pool.acquire() as conn:
                 await conn.execute(_SCHEMA_SQL)
             logger.info("Postgres 连接池已初始化，表结构已就绪")
@@ -88,8 +89,8 @@ class PostgresHistoryRepository:
             pool = await self._ensure_pool()
             async with pool.acquire() as conn:
                 rows = await conn.fetch(
-                    "SELECT id, created_at, analysis_result FROM group_daily_analysis "
-                    "WHERE group_id=$1 ORDER BY created_at DESC LIMIT $2",
+                    "SELECT id, created_at, analysis_result FROM group_daily_analysis"
+                    " WHERE group_id=$1 ORDER BY created_at DESC LIMIT $2",
                     group_id,
                     limit,
                 )

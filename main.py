@@ -141,7 +141,7 @@ class GroupDailyAnalysis(Star):
         dsn = self.config_manager.get_postgres_dsn()
         if dsn:
             self.postgres_repo = PostgresHistoryRepository(dsn)
-            self.analysis_service._postgres_repo = self.postgres_repo
+            self.analysis_service._postgres_repo = self.postgres_repo  # pyright: ignore[reportPrivateUsage]
             logger.info("Postgres 入库已启用")
         else:
             self.postgres_repo = None
