@@ -694,7 +694,9 @@ class AutoScheduler:
 
             # 清理过期批次（保留 2 倍窗口范围的数据作为缓冲）
             try:
-                analysis_days = self.config_manager.get_analysis_days()
+                analysis_days = self.config_manager.get_analysis_days_for_group(
+                    group_id
+                )
                 before_ts = time_mod.time() - (analysis_days * 2 * 24 * 3600)
                 incremental_store = self.analysis_service.incremental_store
                 if incremental_store:

@@ -238,13 +238,13 @@
     "auto_analysis": {
         "description": "定时分析设置",
         "type": "object",
-        "hint": "groups_json 里的群各自指定 cron。不在 JSON 里的群不定时分析。",
+        "hint": "groups_json 里的群各自指定 cron 和可选 analysis_days。不在 JSON 里的群不定时分析。",
         "items": {
             "groups_json": {
                 "type": "text",
-                "description": "各群独立 Cron 表达式 (JSON)",
-                "default": "{\n    \"群号\": \"0 23 * * *\"\n}",
-                "hint": "JSON 格式，键为群号，值为 cron 表达式字符串。在 JSON 里的群才会定时分析，删掉即停用。示例：{\"123456\": \"0 9,21 * * *\", \"789012\": \"0 23 * * *\"}"
+                "description": "各群独立 Cron 和分析天数 (JSON)",
+                "default": "{\n    \"群号\": {\n        \"cron\": \"0 23 * * *\"\n    }\n}",
+                "hint": "JSON 格式，键为群号，值为对象 {\"cron\": \"cron表达式\", \"analysis_days\": 天数(可选)}。analysis_days 不设则使用 basic.analysis_days 全局默认值。旧格式纯字符串 cron 也兼容。示例：{\"123456\": {\"cron\": \"0 9 * * *\", \"analysis_days\": 3}, \"789012\": {\"cron\": \"0 23 * * *\"}}"
             }
         }
     },

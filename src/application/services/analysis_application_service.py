@@ -165,7 +165,7 @@ class AnalysisApplicationService:
 
             # 2. 拉取消息
             if days is None:
-                days = self.config_manager.get_analysis_days()
+                days = self.config_manager.get_analysis_days_for_group(group_id)
             max_count = self.config_manager.get_max_messages()
 
             raw_messages = await adapter.fetch_messages(
@@ -373,7 +373,7 @@ class AnalysisApplicationService:
             last_analyzed_ts = await self.incremental_store.get_last_analyzed_timestamp(
                 group_id
             )
-            days = self.config_manager.get_analysis_days()
+            days = self.config_manager.get_analysis_days_for_group(group_id)
             # 在增量模式下，拉取上限由安全限制 (Safe Count) 统一控制，确保能追平进度且不溢出
             max_count = self.config_manager.get_incremental_safe_limit()
 
@@ -627,7 +627,7 @@ class AnalysisApplicationService:
             )
 
             # 1. 计算滑动窗口范围
-            analysis_days = self.config_manager.get_analysis_days()
+            analysis_days = self.config_manager.get_analysis_days_for_group(group_id)
             window_end = time_mod.time()
             window_start = window_end - (analysis_days * 24 * 3600)
 

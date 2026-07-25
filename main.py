@@ -960,7 +960,7 @@ class GroupDailyAnalysis(Star):
         import time as time_mod
 
         # 计算滑动窗口范围
-        analysis_days = self.config_manager.get_analysis_days()
+        analysis_days = self.config_manager.get_analysis_days_for_group(group_id)
         window_end = time_mod.time()
         window_start = window_end - (analysis_days * 24 * 3600)
 

@@ -120,15 +120,30 @@ class ConfigManager:
         """获取分析天数"""
         return self._get_group("basic").get("analysis_days", 1)
 
-    def _parse_groups_json(self) -> dict[str, str]:
-        """解析 groups_json 为 {group_id: cron}。解析失败返回 {}。"""
+    def _parse_groups_json(self) -> dict[str, dict]:
+        """解析 groups_json 为 {group_id: {cron, analysis_days}}。
+
+        analysis_days 为 None 表示使用全局默认值。
+        兼容旧格式 {group_id: cron_string}。
+        """
         raw = self._get_group("auto_analysis").get("groups_json", "")
         if not raw or not isinstance(raw, str):
             return {}
         try:
             parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                return {str(k): str(v).strip() for k, v in parsed.items() if v}
+            if not isinstance(parsed, dict):
+                return {}
+            result = {}
+            for k, v in parsed.items():
+                if isinstance(v, str):
+                    # 旧格式: {gid: cron}
+                    result[str(k)] = {"cron": v.strip()}
+                elif isinstance(v, dict):
+                    result[str(k)] = {
+                        "cron": str(v.get("cron", "")).strip() if v.get("cron") else "",
+                        "analysis_days": v.get("analysis_days"),  # None → 使用全局默认
+                    }
+            return {k: v for k, v in result.items() if v["cron"]}
         except json.JSONDecodeError as e:
             logger.warning(f"groups_json 解析失败: {e}")
         return {}
@@ -137,16 +152,29 @@ class ConfigManager:
         """获取某群的 cron。不在 groups_json 里返回 None。"""
         if group_id:
             groups = self._parse_groups_json()
-            for gid, cron in groups.items():
+            for gid, cfg in groups.items():
                 if self._is_group_match(str(group_id), gid):
-                    return cron
+                    return cfg["cron"]
         return None
 
+    def get_analysis_days_for_group(self, group_id: str) -> int:
+        """获取某群的 analysis_days。有群级配置则用群级，否则回退全局默认。"""
+        groups = self._parse_groups_json()
+        for gid, cfg in groups.items():
+            if self._is_group_match(str(group_id), gid):
+                if cfg.get("analysis_days") is not None:
+                    return int(cfg["analysis_days"])
+        return self.get_analysis_days()
+
     def get_auto_analysis_groups(self) -> list[dict]:
-        """获取所有定时分析的群。Returns: [{"group_id": str, "cron": str}, ...]"""
+        """获取所有定时分析的群。Returns: [{"group_id": str, "cron": str, "analysis_days": int|None}, ...]"""
         return [
-            {"group_id": gid, "cron": cron}
-            for gid, cron in self._parse_groups_json().items()
+            {
+                "group_id": gid,
+                "cron": cfg["cron"],
+                "analysis_days": cfg.get("analysis_days"),
+            }
+            for gid, cfg in self._parse_groups_json().items()
         ]
 
     def is_auto_analysis_enabled(self) -> bool:
@@ -154,19 +182,21 @@ class ConfigManager:
 
     def is_group_auto_analysis_enabled(self, group_id: str) -> bool:
         groups = self._parse_groups_json()
-        for gid in groups:
+        for gid, cfg in groups.items():
             if self._is_group_match(str(group_id), gid):
-                return True
+                return bool(cfg.get("cron"))
         return False
 
-    def _dump_groups_json(self, groups: dict[str, str]):
+    def _dump_groups_json(self, groups: dict[str, dict]):
         self._ensure_group("auto_analysis")["groups_json"] = json.dumps(
             groups, ensure_ascii=False, indent=2
         )
         self.config.save_config()
 
-    def set_group_auto_analysis_config(self, group_id: str, cron: str):
-        """设置某群的 cron"""
+    def set_group_auto_analysis_config(
+        self, group_id: str, cron: str, analysis_days: int | None = None
+    ):
+        """设置某群的 cron 和可选 analysis_days。"""
         groups = self._parse_groups_json()
         gid = str(group_id)
         existing = None
@@ -174,7 +204,10 @@ class ConfigManager:
             if self._is_group_match(gid, k):
                 existing = k
                 break
-        groups[existing or gid] = cron
+        cfg = {"cron": cron}
+        if analysis_days is not None:
+            cfg["analysis_days"] = analysis_days
+        groups[existing or gid] = cfg
         self._dump_groups_json(groups)
 
     def remove_group_auto_analysis_config(self, group_id: str):
