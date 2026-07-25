@@ -143,56 +143,51 @@ class AutoScheduler:
     # ================================================================
 
     def schedule_jobs(self, context):
-        """根据分层名单配置注册定时任务。"""
-        # 首先清理之前的任务
+        """每个群一个独立 cron job"""
         self.unschedule_jobs(context)
-
-        # unschedule_jobs 会将 _terminating 设为 True (用于关闭场景),
-        # 但 schedule_jobs 意味着插件仍在运行；因此需要重置此标志位
         self._terminating = False
 
-        if not self.config_manager.is_auto_analysis_enabled():
-            logger.info("定时分析名单为空且为白名单模式，不注册定时任务。")
+        groups = self.config_manager.get_auto_analysis_groups()
+        if not groups:
+            logger.info("没有启用了自动分析的群，不注册定时任务。")
             return
 
         scheduler = context.cron_manager.scheduler
+        logger.info(f"为 {len(groups)} 个群注册定时分析任务...")
+        self._schedule_report_time_jobs(scheduler, groups)
 
-        # 1. 注册核心报告生成任务（涵盖全量分析与增量总结报告）
-        # 每个配置的时间点都会触发一次解析
-        logger.info("注册定时分析报告任务...")
-        self._schedule_report_time_jobs(scheduler)
-
-        # 2. 只有在增量功能总开关开启时，才注册全天候的增量提取任务
         if self.config_manager.get_incremental_enabled():
-            logger.info("增量分析功能已开启，正在注册全天增量提取任务...")
+            logger.info("增量分析已开启，注册增量提取任务...")
             self._schedule_incremental_cron_jobs(scheduler)
         else:
-            logger.info("增量分析总开关未启用，仅执行传统定时全量分析。")
+            logger.info("增量分析总开关未启用。")
 
-    def _schedule_report_time_jobs(self, scheduler):
-        """在配置的 cron 表达式时间点注册报告生成任务。
+    def _schedule_report_time_jobs(self, scheduler, groups: list[dict]):
+        """为每个群注册独立 cron 定时任务"""
+        for gc in groups:
+            gid = gc["group_id"]
+            cron = gc["cron"]
+            try:
+                trigger = CronTrigger.from_crontab(cron)
+                job_id = f"astrbot_plugin_qq_group_daily_analysis_{gid}"
 
-        这些任务根据运行时解析出的生效模式，决定执行传统的全量分析还是增量汇报。
-        """
-        expr = self.config_manager.get_auto_analysis_cron()
+                def _make_coro(_gid):
+                    async def _run():
+                        await self._run_scheduled_report_for_group(_gid)
 
-        try:
-            expr = str(expr).strip()
-            trigger = CronTrigger.from_crontab(expr)
-            job_id = "astrbot_plugin_qq_group_daily_analysis_report"
+                    return _run
 
-            scheduler.add_job(
-                self._run_scheduled_report,
-                trigger=trigger,
-                id=job_id,
-                replace_existing=True,
-                misfire_grace_time=60,
-            )
-            self.scheduler_job_ids.append(job_id)
-            logger.info(f"已注册定时报告任务: {expr} (Job ID: {job_id})")
-
-        except Exception as e:
-            logger.error(f"注册定时任务失败 ({expr}): {e}")
+                scheduler.add_job(
+                    _make_coro(gid),
+                    trigger=trigger,
+                    id=job_id,
+                    replace_existing=True,
+                    misfire_grace_time=60,
+                )
+                self.scheduler_job_ids.append(job_id)
+                logger.info(f"已注册群 {gid} 定时任务: {cron}")
+            except Exception as e:
+                logger.error(f"注册群 {gid} 定时任务失败 ({cron}): {e}")
 
     def _schedule_incremental_cron_jobs(self, scheduler):
         """
@@ -262,156 +257,90 @@ class AutoScheduler:
         self.scheduler_job_ids.clear()
 
     # ================================================================
-    # 共享辅助方法：解析定时分析目标
+    # 增量调度辅助：解析目标群
     # ================================================================
 
     async def _get_scheduled_targets(
         self, mode_filter: str | None = None
     ) -> list[tuple[str, str, str]]:
-        """
-        根据分层过滤逻辑判定所有应参与计划分析的目标群组及其分析策略。
-
-        判定过程：
-        1. 准入层：群组必须在基础设置的允许名单内。
-        2. 定时层：群组需通过定时分析名单的过滤。
-        3. 模式层：如果群组在增量名单内，则使用增量模式，否则使用默认策略。
-
-        参数：
-            mode_filter: 如果提供，则只返回匹配指定模式的目标 (traditional 或 incremental)。
-        """
-        # 获取基础信息
-        all_groups = await self._get_all_groups()
-
-        # 预加载所有配置名单和模式
-        sched_list = self.config_manager.get_scheduled_group_list()
-        sched_list_mode = self.config_manager.get_scheduled_group_list_mode()
+        """从 auto_analysis groups 出发，补充平台ID和增量模式判定。仅用于 _run_incremental_analysis。"""
+        auto_groups = self.config_manager.get_auto_analysis_groups()
+        if not auto_groups:
+            return []
 
         incr_list = self.config_manager.get_incremental_group_list()
         incr_list_mode = self.config_manager.get_incremental_group_list_mode()
+        all_groups = await self._get_all_groups()
 
         result = []
+        for gc in auto_groups:
+            gid = gc["group_id"]
+            pid = None
+            for p, g in all_groups:
+                umo = f"{p}:GroupMessage:{g}"
+                if self.config_manager._is_group_match(
+                    gid, str(g)
+                ) or self.config_manager._is_group_match(gid, umo):
+                    pid = p
+                    gid = str(g)
+                    break
+            if not pid:
+                continue
 
-        # 遍历所有平台上的群组
-        for platform_id, group_id_orig in all_groups:
-            group_id = str(group_id_orig)
-            umo = f"{platform_id}:GroupMessage:{group_id}"
-
-            # 1. 准入层判定 (基础黑白名单)
+            umo = f"{pid}:GroupMessage:{gid}"
             if not self.config_manager.is_group_allowed(umo):
                 continue
 
-            # 2. 定时层判定 (定时分析黑白名单)
-            if not self.config_manager.is_group_in_filtered_list(
-                umo, sched_list_mode, sched_list
-            ):
-                continue
-
-            # 3. 模式层判定 (增量黑白名单)
-            # 3. 模式层判定 (增量黑白名单)
             if self.config_manager.is_group_in_filtered_list(
                 umo, incr_list_mode, incr_list
             ):
-                # 如果在增量名单内，则执行增量模式
                 effective_mode = "incremental"
             else:
-                # 不在增量名单内，则执行普通模式
                 effective_mode = "traditional"
 
-            # 4. 模式过滤 (如果函数调用者要求过滤)
             if mode_filter and effective_mode != mode_filter:
                 continue
 
-            result.append((group_id, platform_id, effective_mode))
+            result.append((gid, pid, effective_mode))
 
-        logger.info(
-            f"分层调度解析完成：符合条件的群组共 {len(result)} 个"
-            + (f" (模式过滤: {mode_filter})" if mode_filter else "")
-        )
         return result
 
     # ================================================================
-    # 统一报告调度入口
+    # Per-group 报告调度
     # ================================================================
 
-    async def _run_scheduled_report(self):
-        """统一的定时分析入口。
-
-        在配置的时间点触发，解析所有目标群并根据其分析模式分发任务：
-        - traditional: 执行全量拉取分析并发送报告
-        - incremental: 执行增量最终报告阶段（合并并汇报）
-        """
+    async def _run_scheduled_report_for_group(self, group_id: str):
+        """单个群的定时报告回调（per-group cron job）"""
         if self._terminating:
             return
         try:
-            logger.info("定时报告触发 — 开始解析调度目标")
+            group_name = await self._get_group_name_safe(group_id)
+            trace_id = TraceContext.generate(prefix="report", group_name=group_name)
+            TraceContext.set(trace_id)
 
-            all_targets = await self._get_scheduled_targets()
-
-            if not all_targets:
-                logger.info("没有配置的群聊需要定时分析")
+            pid = await self.get_platform_id_for_group(group_id)
+            if not pid:
+                logger.error(f"无法确定群 {group_id} 的平台，跳过")
                 return
 
-            max_concurrent = self.config_manager.get_max_concurrent_tasks()
-            sem = asyncio.Semaphore(max_concurrent)
-            logger.info(
-                f"定时报告: {len(all_targets)} 个目标 (并发限制: {max_concurrent})"
+            umo = f"{pid}:GroupMessage:{group_id}"
+            incr_list = self.config_manager.get_incremental_group_list()
+            incr_list_mode = self.config_manager.get_incremental_group_list_mode()
+            is_incremental = self.config_manager.is_group_in_filtered_list(
+                umo, incr_list_mode, incr_list
             )
 
-            async def dispatch_group(gid, pid, mode):
-                async with sem:
-                    if mode == "incremental":
-                        return await self._perform_incremental_final_report_for_group_with_timeout(
-                            gid, pid
-                        )
-                    else:
-                        return await self._perform_auto_analysis_for_group_with_timeout(
-                            gid, pid
-                        )
-
-            tasks = []
-            stagger = self.config_manager.get_stagger_seconds() or 2
-            # 针对定时大任务加入交错等待，减少瞬间峰值延迟
-            for idx, (gid, pid, mode) in enumerate(all_targets):
-                if self._terminating:
-                    logger.info("检测到插件正在停止，取消后续任务创建")
-                    break
-
-                # 为前几个任务添加微小的启动间隔，均匀分散 API 压力
-                if idx > 0 and stagger > 0:
-                    await asyncio.sleep(stagger)
-
-                task = asyncio.create_task(
-                    dispatch_group(gid, pid, mode),
-                    name=f"report_{mode}_{gid}",
+            if is_incremental:
+                logger.info(f"群 {group_id} 定时报告: 增量模式")
+                await self._perform_incremental_final_report_for_group_with_timeout(
+                    group_id, pid
                 )
-                tasks.append(task)
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # 统计结果
-            success_count = 0
-            skip_count = 0
-            error_count = 0
-
-            for i, result in enumerate(results):
-                gid, _, _ = all_targets[i]
-                if isinstance(result, DuplicateGroupTaskError):
-                    skip_count += 1
-                elif isinstance(result, Exception):
-                    logger.error(f"群 {gid} 定时报告任务异常: {result}")
-                    error_count += 1
-                elif isinstance(result, dict) and not result.get("success", True):
-                    skip_count += 1
-                else:
-                    success_count += 1
-
-            logger.info(
-                f"定时报告完成 — 成功: {success_count}, 跳过: {skip_count}, "
-                f"失败: {error_count}, 总计: {len(all_targets)}"
-            )
+            else:
+                logger.info(f"群 {group_id} 定时报告: 传统全量")
+                await self._perform_auto_analysis_for_group_with_timeout(group_id, pid)
 
         except Exception as e:
-            logger.error(f"定时报告执行失败: {e}", exc_info=True)
+            logger.error(f"群 {group_id} 定时报告失败: {e}", exc_info=True)
 
     async def _perform_auto_analysis_for_group_with_timeout(
         self, group_id: str, target_platform_id: str | None = None

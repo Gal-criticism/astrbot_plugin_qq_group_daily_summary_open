@@ -905,9 +905,13 @@ class GroupDailyAnalysis(Star):
             mode = self.config_manager.get_group_list_mode()
 
             auto_status = (
-                "已启用" if self.config_manager.is_auto_analysis_enabled() else "未启用"
+                "已启用"
+                if self.config_manager.is_group_auto_analysis_enabled(check_target)
+                else "未启用"
             )
-            auto_cron = self.config_manager.get_auto_analysis_cron()
+            auto_cron = (
+                self.config_manager.get_auto_analysis_cron(check_target) or "未配置"
+            )
 
             output_format = self.config_manager.get_output_format()
             min_threshold = self.config_manager.get_min_messages_threshold()

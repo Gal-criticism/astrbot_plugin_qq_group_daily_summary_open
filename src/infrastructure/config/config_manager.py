@@ -3,6 +3,8 @@
 负责处理插件配置
 """
 
+import json
+
 from astrbot.api import AstrBotConfig
 from astrbot.api.star import StarTools
 
@@ -118,62 +120,80 @@ class ConfigManager:
         """获取分析天数"""
         return self._get_group("basic").get("analysis_days", 1)
 
-    def get_auto_analysis_cron(self) -> str:
-        """获取自动分析 cron 表达式
+    def _parse_groups_json(self) -> dict[str, str]:
+        """解析 groups_json 为 {group_id: cron}。解析失败返回 {}。"""
+        raw = self._get_group("auto_analysis").get("groups_json", "")
+        if not raw or not isinstance(raw, str):
+            return {}
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return {str(k): str(v).strip() for k, v in parsed.items() if v}
+        except json.JSONDecodeError as e:
+            logger.warning(f"groups_json 解析失败: {e}")
+        return {}
 
-        返回标准 5 段 cron 表达式字符串（分 时 日 月 周）。
-        支持兼容旧版 HH:MM 格式自动转换。
-        """
-        group = self._get_group("auto_analysis")
+    def get_auto_analysis_cron(self, group_id: str | None = None) -> str | None:
+        """获取某群的 cron。不在 groups_json 里返回 None。"""
+        if group_id:
+            groups = self._parse_groups_json()
+            for gid, cron in groups.items():
+                if self._is_group_match(str(group_id), gid):
+                    return cron
+        return None
 
-        # 新格式: auto_analysis_cron
-        val = group.get("auto_analysis_cron")
-        if isinstance(val, str) and val.strip():
-            return val.strip()
+    def get_auto_analysis_groups(self) -> list[dict]:
+        """获取所有定时分析的群。Returns: [{"group_id": str, "cron": str}, ...]"""
+        return [
+            {"group_id": gid, "cron": cron}
+            for gid, cron in self._parse_groups_json().items()
+        ]
 
-        # 兼容旧格式: auto_analysis_time (HH:MM 列表 / 字符串)
-        legacy = group.get("auto_analysis_time")
-        if legacy:
-            if isinstance(legacy, str):
-                legacy = [legacy]
-            if isinstance(legacy, list) and legacy:
-                # 取第一个时间，转为 cron 表达式
-                converted = self._hhmm_to_cron(legacy[0])
-                if len(legacy) > 1:
-                    logger.warning(
-                        f"旧版 auto_analysis_time 包含多个时间 {legacy}，"
-                        f"已转为单条 cron: {converted}。如需多时间点，请手动编辑 cron 字段（如 '0 9,21 * * *'）。"
-                    )
-                logger.info(
-                    f"检测到旧版 auto_analysis_time 配置，已自动转换为 cron: {legacy} -> {converted}"
-                )
-                auto_group = self._ensure_group("auto_analysis")
-                auto_group["auto_analysis_cron"] = converted
-                auto_group.pop("auto_analysis_time", None)
-                try:
-                    self.config.save_config()
-                except Exception as e:
-                    logger.warning(f"自动保存 cron 配置失败: {e}")
-                return converted
+    def is_auto_analysis_enabled(self) -> bool:
+        return len(self._parse_groups_json()) > 0
 
-        return "0 9 * * *"
+    def is_group_auto_analysis_enabled(self, group_id: str) -> bool:
+        groups = self._parse_groups_json()
+        for gid in groups:
+            if self._is_group_match(str(group_id), gid):
+                return True
+        return False
 
-    @staticmethod
-    def _hhmm_to_cron(hhmm: str) -> str:
-        """将 HH:MM 格式转换为 5 段 cron 表达式"""
-        hhmm = hhmm.replace("：", ":").strip()
-        parts = hhmm.split(":")
-        hour = int(parts[0])
-        minute = int(parts[1]) if len(parts) > 1 else 0
-        return f"{minute} {hour} * * *"
+    def _dump_groups_json(self, groups: dict[str, str]):
+        self._ensure_group("auto_analysis")["groups_json"] = json.dumps(
+            groups, ensure_ascii=False, indent=2
+        )
+        self.config.save_config()
+
+    def set_group_auto_analysis_config(self, group_id: str, cron: str):
+        """设置某群的 cron"""
+        groups = self._parse_groups_json()
+        gid = str(group_id)
+        existing = None
+        for k in groups:
+            if self._is_group_match(gid, k):
+                existing = k
+                break
+        groups[existing or gid] = cron
+        self._dump_groups_json(groups)
+
+    def remove_group_auto_analysis_config(self, group_id: str):
+        """删除某群"""
+        groups = self._parse_groups_json()
+        gid = str(group_id)
+        for k in list(groups.keys()):
+            if self._is_group_match(gid, k):
+                del groups[k]
+                self._dump_groups_json(groups)
+                return
+
+    # ---- 兼容旧接口 (deprecated) ----
+
+    def get_default_auto_analysis_cron(self) -> str:
+        """[已废弃] 返回空字符串"""
+        return ""
 
     def get_enable_auto_analysis(self) -> bool:
-        """
-        获取是否启用自动分析（兼容旧接口）。
-
-        旧版本使用 auto_analysis.enable_auto_analysis 布尔值；
-        新版本改为由 scheduled_group_list_mode + scheduled_group_list 推导。
-        """
         return self.is_auto_analysis_enabled()
 
     def get_output_format(self) -> str:
@@ -587,66 +607,39 @@ class ConfigManager:
         self.config.save_config()
 
     def set_auto_analysis_cron(self, cron_val: str):
-        """设置自动分析 cron 表达式"""
-        self._ensure_group("auto_analysis")["auto_analysis_cron"] = cron_val
-        self.config.save_config()
-
-    def is_auto_analysis_enabled(self) -> bool:
-        """
-        判断自动分析功能是否通过名单“按需开启”。
-        逻辑：如果是白名单模式且名单不为空，或者为黑名单模式，则视为开启。
-        """
-        mode = self.get_scheduled_group_list_mode()
-        lst = self.get_scheduled_group_list()
-        return (mode == "whitelist" and len(lst) > 0) or (mode == "blacklist")
+        """[已废弃] 不再使用全局 cron"""
+        pass
 
     def get_scheduled_group_list_mode(self) -> str:
-        """获取定时分析名单模式 (whitelist/blacklist)"""
-        return self._get_group("auto_analysis").get(
-            "scheduled_group_list_mode", "whitelist"
-        )
+        """[已废弃]"""
+        return "whitelist"
 
     def set_scheduled_group_list_mode(self, mode: str):
-        """设置定时分析名单模式"""
-        self._ensure_group("auto_analysis")["scheduled_group_list_mode"] = mode
-        self.config.save_config()
+        """[已废弃]"""
+        pass
 
     def get_scheduled_group_list(self) -> list[str]:
-        """获取定时分析目标群列表"""
-        return self._get_group("auto_analysis").get("scheduled_group_list", [])
+        """[已废弃] 从 groups_json 推导"""
+        return list(self._parse_groups_json().keys())
 
     def set_scheduled_group_list(self, groups: list[str]):
-        """设置定时分析目标群列表"""
-        self._ensure_group("auto_analysis")["scheduled_group_list"] = groups
-        self.config.save_config()
+        """[已废弃] 逐群写入 groups_json"""
+        for g in groups:
+            self.set_group_auto_analysis_config(str(g))
 
     def is_group_in_filtered_list(
         self, group_umo_or_id: str, mode: str, group_list: list
     ) -> bool:
-        """
-        通用的名单判定逻辑。
-
-        逻辑如下：
-        - whitelist 模式：
-            - 如果列表为空，则视为“此级别未开启”。
-            - 如果不为空，仅在列表中的通过。
-        - blacklist 模式：
-            - 在列表中的不通过。
-            - 如果列表为空，则全部通过。
-        """
+        """[已废弃] 通用名单判定逻辑。增量分析仍在使用。"""
         group_list = [str(x).strip() for x in group_list]
         target = str(group_umo_or_id).strip()
-
         if mode == "whitelist":
             if not group_list:
-                # 白名单为空：此级别不开启 (按需开启逻辑)
                 return False
             return any(self._is_group_match(target, item) for item in group_list)
-        else:  # blacklist
-            if not group_list:
-                # 黑名单为空：全通过
-                return True
-            return not any(self._is_group_match(target, item) for item in group_list)
+        if not group_list:
+            return True
+        return not any(self._is_group_match(target, item) for item in group_list)
 
     def set_min_messages_threshold(self, threshold: int):
         """设置最小消息阈值"""

@@ -7,11 +7,7 @@
             "group_list_mode": {
                 "description": "群聊权限模式",
                 "type": "string",
-                "options": [
-                    "whitelist",
-                    "blacklist",
-                    "none"
-                ],
+                "options": ["whitelist", "blacklist", "none"],
                 "default": "none",
                 "hint": "先决定“哪些群可以用这个插件”。这是第一道门槛：不通过这里，后面的定时/增量都不会触发。whitelist=只允许列表里的群；blacklist=屏蔽列表里的群；none=所有群都可以。示例：whitelist + [\"onebot:GroupMessage:123456\"] 表示只有这个群能用。"
             },
@@ -60,11 +56,7 @@
             "output_format": {
                 "type": "string",
                 "description": "输出格式",
-                "options": [
-                    "image",
-                    "text",
-                    "html"
-                ],
+                "options": ["image", "text", "html"],
                 "default": "image",
                 "hint": "选择分析报告的输出方式：image(图片)、text(纯文本摘要)、html(可交互式网页文件)"
             },
@@ -88,11 +80,7 @@
             "profile_display_mode": {
                 "type": "string",
                 "description": "人格标签展示模式",
-                "options": [
-                    "mbti",
-                    "sbti",
-                    "acgti"
-                ],
+                "options": ["mbti", "sbti", "acgti"],
                 "default": "mbti",
                 "hint": "只影响群友画像卡片的角色主题展示，不影响实际 MBTI 分析结果。mbti=原始 MBTI，sbti=映射为 SBTI 人格，acgti=映射为 ACGTI 角色。"
             },
@@ -105,10 +93,7 @@
             "profile_image_size_mode": {
                 "type": "string",
                 "description": "人格背景图尺寸模式",
-                "options": [
-                    "contain",
-                    "cover"
-                ],
+                "options": ["contain", "cover"],
                 "default": "contain",
                 "hint": "建议默认 contain，减少角色图被裁切过多的问题。"
             },
@@ -253,32 +238,13 @@
     "auto_analysis": {
         "description": "定时分析设置",
         "type": "object",
-        "hint": "配置每日自动分析的时间点和目标群聊范围。只有先通过基础群权限的群，才会在这里继续判断。",
+        "hint": "groups_json 里的群各自指定 cron。不在 JSON 里的群不定时分析。",
         "items": {
-            "auto_analysis_cron": {
-                "type": "string",
-                "description": "自动分析 Cron 表达式",
-                "default": "0 23 * * *",
-                "hint": "标准 5 段 cron 表达式 (分 时 日 月 周)。字段内用逗号表示多个值，如 '0 9,21 * * *' 即每天 9 点和 21 点各触发一次。注意: 拉取天数由 basic.analysis_days 独立控制，与 cron 频率无关。"
-            },
-            "scheduled_group_list_mode": {
-                "type": "string",
-                "description": "定时分析名单模式",
-                "options": [
-                    "whitelist",
-                    "blacklist"
-                ],
-                "default": "whitelist",
-                "hint": "定时任务要作用到哪些群。whitelist=只跑下面列表里的群；blacklist=除了下面列表，其他都跑。注意：这里只对“已通过基础群权限”的群生效。"
-            },
-            "scheduled_group_list": {
-                "type": "list",
-                "description": "定时分析群列表",
-                "default": [],
-                "hint": "定时任务群列表。示例1：mode=whitelist + [\"onebot:GroupMessage:123456\"] => 只跑这个群。示例2：mode=blacklist + [\"onebot:GroupMessage:123456\"] => 这个群不跑，其他群跑。注意：whitelist + 空列表 = 不会开启定时任务。即使某群在增量名单里，只要不在定时白名单里，也不会自动触发。",
-                "items": {
-                    "type": "string"
-                }
+            "groups_json": {
+                "type": "text",
+                "description": "各群独立 Cron 表达式 (JSON)",
+                "default": "{\n    \"群号\": \"0 23 * * *\"\n}",
+                "hint": "JSON 格式，键为群号，值为 cron 表达式字符串。在 JSON 里的群才会定时分析，删掉即停用。示例：{\"123456\": \"0 9,21 * * *\", \"789012\": \"0 23 * * *\"}"
             }
         }
     },
@@ -437,10 +403,7 @@
             "incremental_group_list_mode": {
                 "type": "string",
                 "description": "增量分析名单模式",
-                "options": [
-                    "whitelist",
-                    "blacklist"
-                ],
+                "options": ["whitelist", "blacklist"],
                 "default": "whitelist",
                 "hint": "哪些群用“增量分析”。whitelist=只有列表里的群用增量；blacklist=除了列表外都用增量。没命中的群会走普通模式。注意：增量名单不负责放行群，只负责选模式。"
             },
