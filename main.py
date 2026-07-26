@@ -1005,15 +1005,32 @@ class GroupDailyAnalysis(Star):
                     if hasattr(stats, "participant_count")
                     else stats.get("participant_count", "?")
                 )
-                topics = r.get("topics", [])
-                topic_str = "、".join(
-                    t.get("topic", t.topic if hasattr(t, "topic") else "?")
-                    for t in topics[:3]
-                )
+                work_summaries = r.get("work_summaries", [])
                 lines.append(
-                    f"#{rid} {created} | 💬 {msg_count}条 | 👥 {participant}人\n"
-                    f"   话题: {topic_str or '（无）'}"
+                    f"#{rid} {created} | 💬 {msg_count}条 | 👥 {participant}人"
                 )
+                if work_summaries:
+                    for ws in work_summaries[:5]:
+                        name = ws.get("name", ws.name if hasattr(ws, "name") else "?")
+                        summary = ws.get(
+                            "summary", ws.summary if hasattr(ws, "summary") else ""
+                        )
+                        tasks = ws.get(
+                            "tasks", ws.tasks if hasattr(ws, "tasks") else []
+                        )
+                        status = ws.get(
+                            "status", ws.status if hasattr(ws, "status") else ""
+                        )
+                        line = f"  👤 {name}"
+                        if status:
+                            line += f" [{status}]"
+                        if summary:
+                            line += f": {summary}"
+                        if tasks:
+                            line += f"\n    任务: {'、'.join(tasks)}"
+                        lines.append(line)
+                else:
+                    lines.append("  📋 无工作总结")
 
             yield event.plain_result("\n".join(lines))
 
