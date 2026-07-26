@@ -990,48 +990,36 @@ class GroupDailyAnalysis(Star):
                 yield event.plain_result("📭 未找到该群的历史分析记录")
                 return
 
-            lines = [f"📊 本群最近 {len(results)} 条分析记录:\n"]
+            platform_id = self._get_platform_id_from_event(event)
+            adapter = self.bot_manager.get_adapter(platform_id)
+
+            async def avatar_url_getter(user_id: str):
+                if adapter and hasattr(adapter, "get_user_avatar_url"):
+                    return await adapter.get_user_avatar_url(user_id, size=40)
+                return None
+
+            yield event.plain_result(f"🔍 正在生成 {len(results)} 条历史分析报告...")
+
             for r in results:
                 rid = r.get("id", "?")
-                created = r.get("created_at", "?")
-                stats = r.get("statistics", {})
-                if isinstance(stats, dict):
-                    msg_count = stats.get("message_count", "?")
-                    participant = stats.get("participant_count", "?")
-                elif hasattr(stats, "message_count"):
-                    msg_count = getattr(stats, "message_count", 0)
-                    participant = getattr(stats, "participant_count", 0)
-                else:
-                    msg_count = "?"
-                    participant = "?"
-                work_summaries = r.get("work_summaries", [])
-                lines.append(
-                    f"#{rid} {created} | 💬 {msg_count}条 | 👥 {participant}人"
-                )
-                if work_summaries:
-                    for ws in work_summaries[:5]:
-                        name = ws.get("name", ws.name if hasattr(ws, "name") else "?")
-                        summary = ws.get(
-                            "summary", ws.summary if hasattr(ws, "summary") else ""
-                        )
-                        tasks = ws.get(
-                            "tasks", ws.tasks if hasattr(ws, "tasks") else []
-                        )
-                        status = ws.get(
-                            "status", ws.status if hasattr(ws, "status") else ""
-                        )
-                        line = f"  👤 {name}"
-                        if status:
-                            line += f" [{status}]"
-                        if summary:
-                            line += f": {summary}"
-                        if tasks:
-                            line += f"\n    任务: {'、'.join(tasks)}"
-                        lines.append(line)
-                else:
-                    lines.append("  📋 无工作总结")
+                analysis_result = r.get("analysis_result", {})
+                created = str(r.get("created_at", ""))[:10]
 
-            yield event.plain_result("\n".join(lines))
+                html_path, _ = await self.report_generator.generate_html_report(
+                    analysis_result,
+                    group_id,
+                    avatar_url_getter=avatar_url_getter,
+                    avatar_cache_namespace=platform_id,
+                )
+                if html_path:
+                    caption = f"📊 历史分析 #{rid} ({created})"
+                    sent = await self.message_sender.send_file(
+                        group_id, html_path, caption, platform_id
+                    )
+                    if not sent:
+                        yield event.plain_result(f"⚠️ 历史分析 #{rid} 文件发送失败")
+                else:
+                    yield event.plain_result(f"⚠️ 历史分析 #{rid} HTML 生成失败")
 
         except Exception as e:
             logger.error(f"查询历史分析记录失败: {e}", exc_info=True)
