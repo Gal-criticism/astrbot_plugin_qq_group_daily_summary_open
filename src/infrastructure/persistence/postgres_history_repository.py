@@ -28,7 +28,9 @@ def _dataclass_to_dict(obj):
 
 
 _SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS group_daily_analysis (
+CREATE SCHEMA IF NOT EXISTS work_summary;
+
+CREATE TABLE IF NOT EXISTS work_summary.group_daily_analysis (
     id SERIAL PRIMARY KEY,
     group_id TEXT NOT NULL,
     analysis_result JSONB NOT NULL,
@@ -36,7 +38,7 @@ CREATE TABLE IF NOT EXISTS group_daily_analysis (
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_created
-    ON group_daily_analysis(group_id, created_at DESC);
+    ON work_summary.group_daily_analysis(group_id, created_at DESC);
 """
 
 
@@ -67,7 +69,7 @@ class PostgresHistoryRepository:
             pool = await self._ensure_pool()
             async with pool.acquire() as conn:
                 await conn.execute(
-                    "INSERT INTO group_daily_analysis (group_id, analysis_result) VALUES ($1, $2)",
+                    "INSERT INTO work_summary.group_daily_analysis (group_id, analysis_result) VALUES ($1, $2)",
                     group_id,
                     json.dumps(
                         analysis_result, ensure_ascii=False, default=_dataclass_to_dict
@@ -85,7 +87,7 @@ class PostgresHistoryRepository:
             pool = await self._ensure_pool()
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
-                    "SELECT id, created_at, analysis_result FROM group_daily_analysis WHERE id=$1",
+                    "SELECT id, created_at, analysis_result FROM work_summary.group_daily_analysis WHERE id=$1",
                     analysis_id,
                 )
                 if row:
@@ -105,7 +107,7 @@ class PostgresHistoryRepository:
             pool = await self._ensure_pool()
             async with pool.acquire() as conn:
                 rows = await conn.fetch(
-                    "SELECT id, created_at, analysis_result FROM group_daily_analysis"
+                    "SELECT id, created_at, analysis_result FROM work_summary.group_daily_analysis"
                     " WHERE group_id=$1 ORDER BY created_at DESC LIMIT $2",
                     group_id,
                     limit,
@@ -128,7 +130,7 @@ class PostgresHistoryRepository:
             pool = await self._ensure_pool()
             async with pool.acquire() as conn:
                 rows = await conn.fetch(
-                    "SELECT DISTINCT group_id FROM group_daily_analysis ORDER BY group_id"
+                    "SELECT DISTINCT group_id FROM work_summary.group_daily_analysis ORDER BY group_id"
                 )
                 return [r["group_id"] for r in rows]
         except Exception as e:
