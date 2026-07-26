@@ -6,12 +6,26 @@ Postgres 历史分析结果仓库
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import Any
 
 import asyncpg
 
 from ...utils.logger import logger
+
+
+def _dataclass_to_dict(obj):
+    """递归转换 dataclass 为 dict，供 json.dumps default 调用"""
+    if dataclasses.is_dataclass(obj):
+        return {
+            f.name: _dataclass_to_dict(getattr(obj, f.name))
+            for f in dataclasses.fields(obj)
+        }
+    if isinstance(obj, list):
+        return [_dataclass_to_dict(item) for item in obj]
+    return obj
+
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS group_daily_analysis (
@@ -55,7 +69,9 @@ class PostgresHistoryRepository:
                 await conn.execute(
                     "INSERT INTO group_daily_analysis (group_id, analysis_result) VALUES ($1, $2)",
                     group_id,
-                    json.dumps(analysis_result, ensure_ascii=False, default=str),
+                    json.dumps(
+                        analysis_result, ensure_ascii=False, default=_dataclass_to_dict
+                    ),
                 )
             logger.debug(f"已入库: group={group_id}")
             return True

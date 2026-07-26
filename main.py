@@ -995,16 +995,15 @@ class GroupDailyAnalysis(Star):
                 rid = r.get("id", "?")
                 created = r.get("created_at", "?")
                 stats = r.get("statistics", {})
-                msg_count = (
-                    getattr(stats, "message_count", 0)
-                    if hasattr(stats, "message_count")
-                    else stats.get("message_count", "?")
-                )
-                participant = (
-                    getattr(stats, "participant_count", 0)
-                    if hasattr(stats, "participant_count")
-                    else stats.get("participant_count", "?")
-                )
+                if isinstance(stats, dict):
+                    msg_count = stats.get("message_count", "?")
+                    participant = stats.get("participant_count", "?")
+                elif hasattr(stats, "message_count"):
+                    msg_count = getattr(stats, "message_count", 0)
+                    participant = getattr(stats, "participant_count", 0)
+                else:
+                    msg_count = "?"
+                    participant = "?"
                 work_summaries = r.get("work_summaries", [])
                 lines.append(
                     f"#{rid} {created} | 💬 {msg_count}条 | 👥 {participant}人"
